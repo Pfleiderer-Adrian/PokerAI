@@ -10,7 +10,6 @@ def parsePluribus(path_to_txt):
 
 def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigblind):
     i = 0
-    # test
     j = spieler_pos
     ret = []
     rase_amount = bigblind
