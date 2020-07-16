@@ -1,0 +1,11 @@
+pytz
+requests
+lxml
+python-dateutil
+parsedatetime
+cached-property
+click
+pathlib
+configparser
+zope.interface
+attrs
