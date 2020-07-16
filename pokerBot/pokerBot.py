@@ -94,7 +94,7 @@ def getPluribusHands(data, name):
         
     return ret
 
-allData = parsePluribus("/poker-0.30.0/sample_game_117.log")
+allData = parsePluribus("./TestData/sample_game_117.log")
 for (i, item) in enumerate(getPluribusHands(allData[4:-2], "Pluribus")):
     print(str(i)+": ", item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13])
 

@@ -41,6 +41,7 @@
     <Compile Include="pokerBot.py" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="TestData\" />
     <Folder Include="poker-0.30.0\" />
     <Folder Include="poker-0.30.0\poker.egg-info\" />
     <Folder Include="poker-0.30.0\poker\" />
@@ -58,6 +59,7 @@
     <Content Include="poker-0.30.0\poker.egg-info\top_level.txt" />
     <Content Include="poker-0.30.0\README.rst" />
     <Content Include="poker-0.30.0\setup.cfg" />
+    <Content Include="TestData\sample_game_117.log" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
