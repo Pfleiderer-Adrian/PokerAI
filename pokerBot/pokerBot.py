@@ -6,8 +6,6 @@ höheBigblind = 100
 höheSmallblind = 50
 bigblind_pos = 1
 smallblind_pos = 0
-pos = 0
-
 
 def parsePluribus(path_to_txt):
     op = open (path_to_txt, "r")
