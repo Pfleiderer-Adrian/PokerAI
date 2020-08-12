@@ -13,11 +13,15 @@ def parsePluribus(path_to_txt):
     splitdata = data.split("\n")
     return splitdata
 
-def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigblind):
+def calculateSituation(spieler, spielername, situation_string, spieler_pos, actualPot):
     i = 0
     j = spieler_pos
     ret = []
-    raise_amount = bigblind
+    tempOpenCall = 0
+    caller = -1
+    # raise_amount Placeholder
+    raise_amount = 0
+    
     spieler_temp = spieler.copy()
     while i < len(situation_string):
         if(j >= len(spieler_temp)):
@@ -28,9 +32,16 @@ def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigb
             while situation_string[k].isdigit():
                 raise_amount_string = raise_amount_string + situation_string[k]
                 k = k + 1
-            raise_amount = int(raise_amount_string) - raise_amount 
+            if(caller == i):
+                tempOpenCall = int(raise_amount_string) - tempOpenCall
+                caller = i
+            else:
+                tempOpenCall = int(raise_amount_string)
+            if(caller == -1):
+                caller = i
+            actualPot = actualPot + tempOpenCall
             if(spieler_temp[j] == spielername):
-                ret.append((0,0,1, raise_amount))
+                ret.append((0,0,1, raise_amount, actualPot))
             j = j + 1
             if(j > len(spieler_temp)):
                 j = 0
@@ -38,15 +49,16 @@ def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigb
             continue
         if(situation_string[i] == "f"):
             if(spieler_temp[j] == spielername):
-                ret.append((1,0,0,raise_amount))
+                ret.append((1,0,0,raise_amount, actualPot))
             spieler_temp.remove(spieler_temp[j])
             j = j - 1
         if(situation_string[i] == "c"):
+            actualPot = actualPot + tempOpenCall
             if(spieler_temp[j] == spielername):
-                ret.append((0,1,0,raise_amount))
+                ret.append((0,1,0,raise_amount, actualPot))
         j = j + 1
         i = i + 1
-    return ret, spieler_temp
+    return ret, spieler_temp, actualPot
 
 
 def getPluribusHands(data, name):
@@ -82,17 +94,17 @@ def getPluribusHands(data, name):
         #situations[0]: Preflop, situations[1]: Flop, situations[2]: Turn, situations[3]: River
         situations = re.split("/", situations_string)
 
-        preflop, spieler_preflop = calculateSituation(spieler, spielername, situations[0], 2, höheBigblind)
+        preflop, spieler_preflop, actualpot = calculateSituation(spieler, spielername, situations[0], 2, höheBigblind+höheSmallblind)
         if(len(situations) > 1): 
-            flop, spieler_flop = calculateSituation(spieler_preflop, spielername, situations[1], 0, höheBigblind)
+            flop, spieler_flop, actualpot = calculateSituation(spieler_preflop, spielername, situations[1], 0, actualpot)
         else:
             flop = []
         if(len(situations) > 2): 
-           turn, spieler_turn = calculateSituation(spieler_flop, spielername, situations[2], 0, höheBigblind)
+           turn, spieler_turn, actualpot = calculateSituation(spieler_flop, spielername, situations[2], 0, actualpot)
         else:
            turn = []
         if(len(situations) > 3): 
-            river, spieler_river = calculateSituation(spieler_turn, spielername, situations[3], 0, höheBigblind)
+            river, spieler_river, actualpot = calculateSituation(spieler_turn, spielername, situations[3], 0, actualpot)
         else:
            river = []
            
