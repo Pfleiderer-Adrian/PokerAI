@@ -69,6 +69,9 @@ def getPluribusHands(data, name):
         handkarten_string = dot_split[3]
         handkarten_alle = handkarten_string.split("|")
         handkarten = handkarten_alle[spieler_pos]
+        handkarten = handkarten.split("/")[0]
+
+        
 
 
         anzahlSpieler = len(spieler)
