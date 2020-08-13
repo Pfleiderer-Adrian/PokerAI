@@ -102,7 +102,7 @@ def getPluribusHands(data, name):
 
 #PreflopSituation muss ausgelagert werden, weil... (?)
 def calculatePreflopSituation(spieler, situation, spieler_pos):
-    test = 1
+    pass
 
 
 allData = parsePluribus("./TestData/sample_game_117.log")
