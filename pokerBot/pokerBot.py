@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import copy
 
 höheBigblind = 100
 höheSmallblind = 50
@@ -13,12 +14,33 @@ def parsePluribus(path_to_txt):
     splitdata = data.split("\n")
     return splitdata
 
-def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigblind):
+def calculateSituation(spieler, spielername, situation_string, actualPot, isPreflop):
     i = 0
-    j = spieler_pos
+    j = 0
     ret = []
-    raise_amount = bigblind
-    spieler_temp = spieler.copy()
+    # raise_amount Placeholder
+    raise_amount = 0
+    
+    # special order for preflop
+    spieler_temp = copy.deepcopy(spieler)
+    singlepot = [0] * (len(spieler_temp)+1)
+    if(isPreflop):
+        caller = höheBigblind
+        spieler_temp.remove(spieler_temp[0])
+        spieler_temp.remove(spieler_temp[0])
+        spieler_temp.append(spieler[0])
+        spieler_temp.append(spieler[1])
+        singlepot[len(spieler_temp)-1] = höheSmallblind
+        singlepot[len(spieler_temp)-2] = höheBigblind
+    else:
+        singlepot = actualPot
+        caller = singlepot[0]
+
+    # When Pluribus is on last posistion and all enemys are gone the sourcelog are inconsistent. -> no Pluribus action recorded
+    if((situation_string == "fffff") and (spieler_temp[-1] == spielername)):
+        ret.append((0,1,0,0,150))
+        return ret, spieler_temp, singlepot
+
     while i < len(situation_string):
         if(j >= len(spieler_temp)):
             j = 0
@@ -28,25 +50,33 @@ def calculateSituation(spieler, spielername, situation_string, spieler_pos, bigb
             while situation_string[k].isdigit():
                 raise_amount_string = raise_amount_string + situation_string[k]
                 k = k + 1
-            raise_amount = int(raise_amount_string) - raise_amount 
             if(spieler_temp[j] == spielername):
-                ret.append((0,0,1, raise_amount))
-            j = j + 1
-            if(j > len(spieler_temp)):
-                j = 0
-            i = k
-            continue
+                ret.append((0,0,1, raise_amount, sum(singlepot)))
+            caller = int(raise_amount_string)
+            singlepot[j] = int(raise_amount_string)
+            i =+ k-1
         if(situation_string[i] == "f"):
             if(spieler_temp[j] == spielername):
-                ret.append((1,0,0,raise_amount))
+                ret.append((1,0,0,raise_amount, sum(singlepot)))
+            singlepot[len(spieler_temp)] =+ singlepot[j]
+            singlepot.pop(j)
             spieler_temp.remove(spieler_temp[j])
             j = j - 1
         if(situation_string[i] == "c"):
+            singlepot[j] = caller
             if(spieler_temp[j] == spielername):
-                ret.append((0,1,0,raise_amount))
+                ret.append((0,1,0,raise_amount, sum(singlepot)))
         j = j + 1
         i = i + 1
-    return ret, spieler_temp
+
+    #recreate correct order for after preflop
+    if(isPreflop):
+        tempcopy = copy.deepcopy(spieler)
+        for x in spieler:
+            if(x not in spieler_temp):
+                tempcopy.remove(x)
+        spieler_temp = tempcopy
+    return ret, spieler_temp, singlepot
 
 
 def getPluribusHands(data, name):
@@ -62,10 +92,6 @@ def getPluribusHands(data, name):
         #spieler_pos fängt bei SmallBlind an mit 0 und zählt im Uhrzeigersinn
         spieler_pos = spieler.index(name)
 
-        """
-        Problem: Handkarten, bei denen der Spieler an Position 5 Sitzt und mindestens der Flop aufgedeckt wird,
-        werden die Handkarten falsch erkannt (Der Spieler bekommt auch die Boardkarten mit als Handkarten eingetragen).
-        """
         handkarten_string = dot_split[3]
         handkarten_alle = handkarten_string.split("|")
         handkarten = handkarten_alle[spieler_pos]
@@ -82,17 +108,17 @@ def getPluribusHands(data, name):
         #situations[0]: Preflop, situations[1]: Flop, situations[2]: Turn, situations[3]: River
         situations = re.split("/", situations_string)
 
-        preflop, spieler_preflop = calculateSituation(spieler, spielername, situations[0], 2, höheBigblind)
+        preflop, spieler_preflop, actualpot = calculateSituation(spieler, spielername, situations[0], 0, True)
         if(len(situations) > 1): 
-            flop, spieler_flop = calculateSituation(spieler_preflop, spielername, situations[1], 0, höheBigblind)
+            flop, spieler_flop, actualpot = calculateSituation(spieler_preflop, spielername, situations[1], actualpot, False)
         else:
             flop = []
         if(len(situations) > 2): 
-           turn, spieler_turn = calculateSituation(spieler_flop, spielername, situations[2], 0, höheBigblind)
+           turn, spieler_turn, actualpot = calculateSituation(spieler_flop, spielername, situations[2], actualpot, False)
         else:
            turn = []
         if(len(situations) > 3): 
-            river, spieler_river = calculateSituation(spieler_turn, spielername, situations[3], 0, höheBigblind)
+            river, spieler_river, actualpot = calculateSituation(spieler_turn, spielername, situations[3], actualpot, False)
         else:
            river = []
            
