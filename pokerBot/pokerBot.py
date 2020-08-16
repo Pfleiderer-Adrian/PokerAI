@@ -50,22 +50,25 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
             while situation_string[k].isdigit():
                 raise_amount_string = raise_amount_string + situation_string[k]
                 k = k + 1
+            raise_amount = int(raise_amount_string) - singlepot[j]
             if(spieler_temp[j] == spielername):
                 ret.append((0,0,1, raise_amount, sum(singlepot)))
             caller = int(raise_amount_string)
             singlepot[j] = int(raise_amount_string)
             i =+ k-1
         if(situation_string[i] == "f"):
+            raise_amount = caller - singlepot[j]
             if(spieler_temp[j] == spielername):
-                ret.append((1,0,0,raise_amount, sum(singlepot)))
+                ret.append((1,0,0, raise_amount, sum(singlepot)))
             singlepot[len(spieler_temp)] =+ singlepot[j]
             singlepot.pop(j)
             spieler_temp.remove(spieler_temp[j])
             j = j - 1
         if(situation_string[i] == "c"):
+            raise_amount = caller - singlepot[j]
             singlepot[j] = caller
             if(spieler_temp[j] == spielername):
-                ret.append((0,1,0,raise_amount, sum(singlepot)))
+                ret.append((0,1,0, raise_amount, sum(singlepot)))
         j = j + 1
         i = i + 1
 
