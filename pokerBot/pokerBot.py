@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import re
 import copy
+import glob
+import os
+from keras import models
+from keras import layers
+import matplotlib.pyplot as plt
 
 höheBigblind = 100
 höheSmallblind = 50
@@ -179,13 +184,117 @@ def getPluribusHands(data, name):
            river = []
            
         chips_gewinn_verlust_string = dot_split[4]
-        chips_gewinn_verlust = int(chips_gewinn_verlust_string.split("|")[spieler_pos])
+        #It's possible that these numbers are float and not int that's why it's rounded
+        chips_gewinn_verlust = int(round(float(chips_gewinn_verlust_string.split("|")[spieler_pos])))
         
         ret.append((gameId, spieler, chips, handkarten, spieler_pos, bigblind_pos, smallblind_pos, höheBigblind, höheSmallblind, anzahlSpieler, preflop, flop, turn, river, chips_gewinn_verlust, flop_boardcards, turn_boardcards, river_boardcards))
         
     return ret
 
 
-allData = parsePluribus("./TestData/sample_game_117.log")
+"""allData = parsePluribus("./TestData/sample_game_117.log")
 for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
-    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])
+    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])"""
+
+
+number_of_trainhands = 5890
+number_of_testhands = 4000
+
+def vectorize_sequences(sequences, first_hand, dimension=14):
+    results = np.zeros((len(sequences), dimension))
+    for i, sequence in enumerate(sequences):
+        results[i, sequence[0]] = 1.
+        results[i, sequence[1]] = 1.
+        results[i, 13] = datalist[i + first_hand][4]
+    return results
+
+alphabet = '23456789AKQJTcdhs'
+# define a mapping of chars to integers
+char_to_int = dict((c, i) for i, c in enumerate(alphabet))
+os.chdir("D:/2. Semester Master/Machine Learning/HandHIstory/HandHistory für Bot/PluribusInTabellenFormat/all_games_no_readme")
+datalist = []
+for file in glob.glob("*.log"):
+    allData = parsePluribus(file)
+    for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
+        datalist.append((item[3], item[10][0][0], item[10][0][1], item[10][0][2], item[4]))
+        
+encoded_hands = []
+for j in range(len(datalist)):
+    # integer encode input data
+    card1_encoded = [char_to_int[char] for char in datalist[j][0][0]]
+    card2_encoded = [char_to_int[char] for char in datalist[j][0][2]]
+    encoded_hands.append((card1_encoded[0], card2_encoded[0]))
+    
+x_train = vectorize_sequences(encoded_hands[0:number_of_trainhands], 0)
+y_train = np.zeros((number_of_trainhands, 3), dtype = int)
+for i in range(0,number_of_trainhands-1):
+    y_train[i][0] = datalist[i][1]
+    y_train[i][1] = datalist[i][2]
+    y_train[i][2] = datalist[i][3]
+    
+x_test = vectorize_sequences(encoded_hands[number_of_trainhands:(number_of_trainhands + number_of_testhands)], number_of_trainhands)
+y_test = np.zeros((number_of_testhands, 3), dtype = int)
+for i in range(number_of_testhands, number_of_trainhands + number_of_testhands-1):
+    y_test[i-number_of_trainhands][0] = datalist[i][1]
+    y_test[i-number_of_trainhands][1] = datalist[i][2]
+    y_test[i-number_of_trainhands][2] = datalist[i][3]
+
+
+
+model = models.Sequential()
+model.add(layers.Dense(5, activation='relu', input_shape=(14,)))
+model.add(layers.Dense(12, activation='relu'))
+model.add(layers.Dense(6, activation='relu'))
+model.add(layers.Dense(3, activation='softmax')) 
+model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+"""
+Die Trainingsdaten werden gesplittet in
+wirkliche Trainingsdaten und Validierungsdaten
+"""
+
+x_val = x_train[:2000]
+partial_x_train = x_train[2000:]
+y_val = y_train[:2000]
+partial_y_train = y_train[2000:]
+
+
+"""
+Model wird gefittet und die history gespeichert
+"""
+history = model.fit(partial_x_train, partial_y_train, epochs=180, batch_size=100, validation_data=(x_val, y_val))
+history_dict = history.history
+loss_values = history_dict['loss']
+val_loss_values = history_dict['val_loss']
+epochs = range(1, len(loss_values) + 1)
+
+"""
+Plot der Verlustfunktion
+"""
+plt.plot(epochs, loss_values, 'bo', label='Verlust Training')
+plt.plot(epochs, val_loss_values, 'b', label='Verlust Validierung')
+plt.title('Wert der Verlustfunktion Training/Validierung')
+plt.xlabel('Epochen')
+plt.ylabel('Wert der Verlustfunktion')
+plt.legend()
+plt.show()
+
+
+hands_to_classify = ['AK', 'QA', '27', '95', 'AA', 'QQ', 'A2', '53', '22', '93', 'T3', 'TA', '55', '66', '77', '88', '99','TT', 'JJ', 'KK']
+encoded_hands_to_classify = []
+for i in range(len(hands_to_classify)):
+    card1_encoded = [char_to_int[char] for char in hands_to_classify[i][0]]
+    card2_encoded = [char_to_int[char] for char in hands_to_classify[i][1]]
+    encoded_hands_to_classify.append((card1_encoded[0], card2_encoded[0]))
+    
+array_to_classify = vectorize_sequences(encoded_hands_to_classify, 0)
+predictions = model.predict(array_to_classify)
+for i in range(len(predictions)):
+    max_predict = max(predictions[i][0], predictions[i][1], predictions[i][2])
+    if predictions[i][0] == max_predict:
+        print(hands_to_classify[i] + ': Fold \t Position:' + str(datalist[i][4]))
+    elif predictions[i][1] == max_predict:
+        print(hands_to_classify[i] + ': Call/Check \t Position:' + str(datalist[i][4]))
+    else:
+        print(hands_to_classify[i] + ': Raise \t Position:' + str(datalist[i][4]))
