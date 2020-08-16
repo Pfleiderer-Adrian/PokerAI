@@ -3,7 +3,7 @@ Deep learning project to improve PokerBots against human players.
 
 ## Vision
 Facebook prove with Pluribus that theoretically it is posibile to beat human players with classical tree-algorithmic-structures in a poker game.
-Now we want to develop a deep neural network Bot witch can at least beat moderate to good players in poker.
+Now we want to develop a deep neural network bot witch can at least beat moderate to good players in poker.
 
 ## Steps
 + create a parser for pokergame logs (e.g. Pluribus, Pokerstars..)
