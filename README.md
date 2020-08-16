@@ -1,3 +1,5 @@
+<img src="pokerBot/Images/Banner.png" alt="HTML ERROR" width="1000" height="250">
+
 # PokerAI
 Deep learning project to improve PokerBots against human players.
 
