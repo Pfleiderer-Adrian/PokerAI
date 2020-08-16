@@ -41,14 +41,6 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
         ret.append((0,1,0,0,150))
         return ret, spieler_temp, singlepot
 
-        singlepot = actualPot
-        caller = singlepot[0]
-
-    # When Pluribus is on last posistion and all enemys are gone the sourcelog are inconsistent. -> no Pluribus action recorded
-    if((situation_string == "fffff") and (spieler_temp[-1] == spielername)):
-        ret.append((0,1,0,0,150))
-        return ret, spieler_temp, singlepot
-
     while i < len(situation_string):
         if(j >= len(spieler_temp)):
             j = 0
@@ -59,18 +51,6 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
                 raise_amount_string = raise_amount_string + situation_string[k]
                 k = k + 1
             raise_amount = int(raise_amount_string) - singlepot[j]
-            if isPreflop:
-                if j+2 == 0:
-                    raise_amount = int(raise_amount_string) - raise_amount
-                elif j+2 == 1:
-                elif len(ret) > 0:
-                    raise_amount = int(raise_amount_string) - raise_amount
-                else:
-                    raise_amount = int(raise_amount_string)
-            #TODO: turn and river show wrong raise_amounts
-            else:
-                raise_amount = int(raise_amount_string) - raise_amount - player_put_in_pot
-                
             if(spieler_temp[j] == spielername):
                 ret.append((0,0,1, raise_amount, sum(singlepot)))
             caller = int(raise_amount_string)
