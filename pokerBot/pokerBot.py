@@ -41,6 +41,14 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
         ret.append((0,1,0,0,150))
         return ret, spieler_temp, singlepot
 
+        singlepot = actualPot
+        caller = singlepot[0]
+
+    # When Pluribus is on last posistion and all enemys are gone the sourcelog are inconsistent. -> no Pluribus action recorded
+    if((situation_string == "fffff") and (spieler_temp[-1] == spielername)):
+        ret.append((0,1,0,0,150))
+        return ret, spieler_temp, singlepot
+
     while i < len(situation_string):
         if(j >= len(spieler_temp)):
             j = 0
@@ -51,6 +59,18 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
                 raise_amount_string = raise_amount_string + situation_string[k]
                 k = k + 1
             raise_amount = int(raise_amount_string) - singlepot[j]
+            if isPreflop:
+                if j+2 == 0:
+                    raise_amount = int(raise_amount_string) - raise_amount
+                elif j+2 == 1:
+                elif len(ret) > 0:
+                    raise_amount = int(raise_amount_string) - raise_amount
+                else:
+                    raise_amount = int(raise_amount_string)
+            #TODO: turn and river show wrong raise_amounts
+            else:
+                raise_amount = int(raise_amount_string) - raise_amount - player_put_in_pot
+                
             if(spieler_temp[j] == spielername):
                 ret.append((0,0,1, raise_amount, sum(singlepot)))
             caller = int(raise_amount_string)
@@ -88,11 +108,33 @@ def getPluribusHands(data, name):
         gameId = re.split(":", hand)[1]
         spielername = name
         chips = 10000
+        
+        
+        #reads out the boardcards
+        boardcard_list = []
+        flop_boardcards = ""
+        turn_boardcards = ""
+        river_boardcards = ""
+        split_hand = hand.split("|")
+        if len(split_hand[5].split("/")) > 1:
+            boardcard_list = split_hand[5].split("/")[1:]
+        if len(boardcard_list) == 1:
+            flop_boardcards = boardcard_list[0].split(":")[0]
+        if len(boardcard_list) == 2:
+            flop_boardcards = boardcard_list[0]
+            turn_boardcards = boardcard_list[1].split(":")[0]
+        if len(boardcard_list) == 3:
+            flop_boardcards = boardcard_list[0].split(":")[0]
+            turn_boardcards = boardcard_list[1]
+            river_boardcards = boardcard_list[2].split(":")[0]
+
+        #for each hand the amount of chips that the player has already put into the pot starts with 0
+        player_put_in_pot = 0
 
         dot_split = re.split(":", hand)
         spieler_string = dot_split[5]
         spieler = spieler_string.split("|")
-        #spieler_pos fängt bei SmallBlind an mit 0 und zählt im Uhrzeigersinn
+        #spieler_pos starts with smallblind at 0 and counts clockwise
         spieler_pos = spieler.index(name)
 
         handkarten_string = dot_split[3]
@@ -105,21 +147,33 @@ def getPluribusHands(data, name):
 
         anzahlSpieler = len(spieler)
         
-        # situations_string ist die Kombination aus Aktionen von Preflop bis River z.B: "r250ffffc/cc/cc/cr500f"
+        # situations_string is the combination of actions from preflop to reiver e.g: "r250ffffc/cc/cc/cr500f"
         situations_string = dot_split[2]
 
         #situations[0]: Preflop, situations[1]: Flop, situations[2]: Turn, situations[3]: River
         situations = re.split("/", situations_string)
 
         preflop, spieler_preflop, actualpot = calculateSituation(spieler, spielername, situations[0], 0, True)
+        if preflop:
+            if preflop[-1]:
+                player_put_in_pot = preflop[-1][-2]
+                
         if(len(situations) > 1): 
             flop, spieler_flop, actualpot = calculateSituation(spieler_preflop, spielername, situations[1], actualpot, False)
+            if flop:
+                if flop[-1]:
+                    player_put_in_pot = flop[-1][-2]
         else:
             flop = []
+            
         if(len(situations) > 2): 
            turn, spieler_turn, actualpot = calculateSituation(spieler_flop, spielername, situations[2], actualpot, False)
+           if turn:
+               if turn[-1]:
+                   player_put_in_pot = turn[-1][-2]
         else:
            turn = []
+           
         if(len(situations) > 3): 
             river, spieler_river, actualpot = calculateSituation(spieler_turn, spielername, situations[3], actualpot, False)
         else:
@@ -128,15 +182,11 @@ def getPluribusHands(data, name):
         chips_gewinn_verlust_string = dot_split[4]
         chips_gewinn_verlust = int(chips_gewinn_verlust_string.split("|")[spieler_pos])
         
-        ret.append((gameId, spieler, chips, handkarten, spieler_pos, bigblind_pos, smallblind_pos, höheBigblind, höheSmallblind, anzahlSpieler, preflop, flop, turn, river, chips_gewinn_verlust))
+        ret.append((gameId, spieler, chips, handkarten, spieler_pos, bigblind_pos, smallblind_pos, höheBigblind, höheSmallblind, anzahlSpieler, preflop, flop, turn, river, chips_gewinn_verlust, flop_boardcards, turn_boardcards, river_boardcards))
         
     return ret
-
-#PreflopSituation muss ausgelagert werden, weil... (?)
-def calculatePreflopSituation(spieler, situation, spieler_pos):
-    test = 1
 
 
 allData = parsePluribus("./TestData/sample_game_117.log")
 for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
-    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13])
+    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])
