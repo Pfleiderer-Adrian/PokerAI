@@ -192,20 +192,22 @@ def getPluribusHands(data, name):
     return ret
 
 
-"""allData = parsePluribus("./TestData/sample_game_117.log")
+allData = parsePluribus("./TestData/sample_game_117.log")
 for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
-    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])"""
+    print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])
 
 
 number_of_trainhands = 5890
 number_of_testhands = 4000
 
-def vectorize_sequences(sequences, first_hand, dimension=14):
+
+def vectorize_sequences(sequences, first_hand, dimension=15):
     results = np.zeros((len(sequences), dimension))
     for i, sequence in enumerate(sequences):
         results[i, sequence[0]] = 1.
         results[i, sequence[1]] = 1.
         results[i, 13] = datalist[i + first_hand][4]
+        results[i, 14] = sequence[2]
     return results
 
 alphabet = '23456789AKQJTcdhs'
@@ -221,9 +223,12 @@ for file in glob.glob("*.log"):
 encoded_hands = []
 for j in range(len(datalist)):
     # integer encode input data
+    color = 0
     card1_encoded = [char_to_int[char] for char in datalist[j][0][0]]
     card2_encoded = [char_to_int[char] for char in datalist[j][0][2]]
-    encoded_hands.append((card1_encoded[0], card2_encoded[0]))
+    if datalist[j][0][1] == datalist[j][0][3]:
+        color = 1
+    encoded_hands.append((card1_encoded[0], card2_encoded[0], color))
     
 x_train = vectorize_sequences(encoded_hands[0:number_of_trainhands], 0)
 y_train = np.zeros((number_of_trainhands, 3), dtype = int)
@@ -242,12 +247,11 @@ for i in range(number_of_testhands, number_of_trainhands + number_of_testhands-1
 
 
 model = models.Sequential()
-model.add(layers.Dense(5, activation='relu', input_shape=(14,)))
+model.add(layers.Dense(5, activation='relu', input_shape=(15,)))
 model.add(layers.Dense(12, activation='relu'))
 model.add(layers.Dense(6, activation='relu'))
 model.add(layers.Dense(3, activation='softmax')) 
 model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-
 
 """
 Die Trainingsdaten werden gesplittet in
@@ -263,6 +267,7 @@ partial_y_train = y_train[2000:]
 """
 Model wird gefittet und die history gespeichert
 """
+
 history = model.fit(partial_x_train, partial_y_train, epochs=180, batch_size=100, validation_data=(x_val, y_val))
 history_dict = history.history
 loss_values = history_dict['loss']
@@ -272,6 +277,7 @@ epochs = range(1, len(loss_values) + 1)
 """
 Plot der Verlustfunktion
 """
+
 plt.plot(epochs, loss_values, 'bo', label='Verlust Training')
 plt.plot(epochs, val_loss_values, 'b', label='Verlust Validierung')
 plt.title('Wert der Verlustfunktion Training/Validierung')
@@ -281,20 +287,26 @@ plt.legend()
 plt.show()
 
 
-hands_to_classify = ['AK', 'QA', '27', '95', 'AA', 'QQ', 'A2', '53', '22', '93', 'T3', 'TA', '55', '66', '77', '88', '99','TT', 'JJ', 'KK']
+hands_to_classify = ['AKo', 'QAo', '27s', '95s', 'AAo', 'QQo', 'A2o', '53o', '22o', '93s', 'T3o', 'TAo', '55o', '66o', '77o', '88o', '99o','TTo', 'JJo', 'KKo']
 encoded_hands_to_classify = []
 for i in range(len(hands_to_classify)):
+    color = 0
     card1_encoded = [char_to_int[char] for char in hands_to_classify[i][0]]
     card2_encoded = [char_to_int[char] for char in hands_to_classify[i][1]]
-    encoded_hands_to_classify.append((card1_encoded[0], card2_encoded[0]))
+    if hands_to_classify[i][2] == 's':
+        color = 1
+    encoded_hands_to_classify.append((card1_encoded[0], card2_encoded[0], color))
     
 array_to_classify = vectorize_sequences(encoded_hands_to_classify, 0)
 predictions = model.predict(array_to_classify)
 for i in range(len(predictions)):
     max_predict = max(predictions[i][0], predictions[i][1], predictions[i][2])
     if predictions[i][0] == max_predict:
-        print(hands_to_classify[i] + ': Fold \t Position:' + str(datalist[i][4]))
+        print(hands_to_classify[i] + ': Fold \t \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
     elif predictions[i][1] == max_predict:
-        print(hands_to_classify[i] + ': Call/Check \t Position:' + str(datalist[i][4]))
+        print(hands_to_classify[i] + ': Call/Check \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
     else:
-        print(hands_to_classify[i] + ': Raise \t Position:' + str(datalist[i][4]))
+        print(hands_to_classify[i] + ': Raise \t \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
+
+        
+
