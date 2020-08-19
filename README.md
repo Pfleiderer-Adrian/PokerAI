@@ -9,7 +9,7 @@ Now we want to develop a deep neural network bot which can at least beat moderat
 
 ## Steps
 + create a parser for pokergame logs (e.g. Pluribus, Pokerstars..)
-+ draw up a theoretically concept for an artificial intelligence in poker
++ draw up a theoretical concept for an artificial intelligence in poker
 + create a lerning concept
 + test the results
 + improve the concepts
