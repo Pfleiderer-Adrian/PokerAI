@@ -1,5 +1,11 @@
 import re
 import copy
+import numpy as np
+import glob
+import os
+from keras import models
+from keras import layers
+import matplotlib.pyplot as plt
 
 höheBigblind = 100
 höheSmallblind = 50
@@ -24,7 +30,6 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
     spieler_temp = copy.deepcopy(spieler)
     singlepot = [0] * (len(spieler_temp)+1)
     if(isPreflop):
-        print(spieler)
         caller = höheBigblind
         spieler_temp.remove(spieler_temp[0])
         spieler_temp.remove(spieler_temp[0])
@@ -161,7 +166,7 @@ def getPluribusHands(data, name):
            river = []
            
         chips_gewinn_verlust_string = dot_split[4]
-        chips_gewinn_verlust = int(chips_gewinn_verlust_string.split("|")[spieler_pos])
+        chips_gewinn_verlust = float(chips_gewinn_verlust_string.split("|")[spieler_pos])
         
         ret.append((gameId, spieler, chips, handkarten, spieler_pos, bigblind_pos, smallblind_pos, höheBigblind, höheSmallblind, anzahlSpieler, preflop, flop, turn, river, chips_gewinn_verlust, flop_boardcards, turn_boardcards, river_boardcards))
         
@@ -171,3 +176,231 @@ def getPluribusHands(data, name):
 allData = parsePluribus("./TestData/sample_game_117.log")
 for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
     print(str(i)+": ", item[3], item[10],"\t\t\t", item[11], "\t\t\t ", item[12], "\t\t\t", item[13], item[15], item[16], item[17])
+    
+    
+
+"""
+Neural network to compute wheter player should call/check, fold or raise in a given preflop situation
+"""
+number_of_trainhands = 5890
+number_of_testhands = 4000
+alphabet = '23456789AKQJTcdhs'
+# define a mapping of chars to integers
+char_to_int = dict((c, i) for i, c in enumerate(alphabet))
+
+
+def vectorize_sequences(sequences, first_hand, dimension=15):
+    results = np.zeros((len(sequences), dimension))
+    for i, sequence in enumerate(sequences):
+        results[i, sequence[0]] = 1.
+        results[i, sequence[1]] = 1.
+        results[i, 13] = datalist[i + first_hand][4]
+        results[i, 14] = sequence[2]
+    return results
+
+def prepare_raise_inputs(sequences, chips_to_call, first_hand, dimension=16):
+    results = np.zeros((len(sequences), dimension))
+    for i, sequence in enumerate(sequences):
+        results[i, sequence[0]] = 1.
+        results[i, sequence[1]] = 1.
+        results[i, 13] = chips_raised[i + first_hand][3]
+        results[i, 14] = sequence[2]
+        results[i, 15] = chips_to_call[i][1]
+    return results
+
+def encode_hands(datalist):
+    encoded_hands = []
+    for j in range(len(datalist)):
+        # integer encode input data
+        color = 0
+        card1_encoded = [char_to_int[char] for char in datalist[j][0][0]]
+        card2_encoded = [char_to_int[char] for char in datalist[j][0][2]]
+        if datalist[j][0][1] == datalist[j][0][3]:
+            color = 1
+        encoded_hands.append((card1_encoded[0], card2_encoded[0], color))
+    return encoded_hands
+
+os.chdir("D:/2. Semester Master/Machine Learning/HandHIstory/HandHistory für Bot/PluribusInTabellenFormat/all_games_no_readme")
+datalist = []
+for file in glob.glob("*.log"):
+    allData = parsePluribus(file)
+    for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
+        datalist.append((item[3], item[10][0][0], item[10][0][1], item[10][0][2], item[4]))
+
+encoded_hands = encode_hands(datalist)
+x_train = vectorize_sequences(encoded_hands[0:number_of_trainhands], 0)
+y_train = np.zeros((number_of_trainhands, 3), dtype = int)
+for i in range(0,number_of_trainhands-1):
+    y_train[i][0] = datalist[i][1]
+    y_train[i][1] = datalist[i][2]
+    y_train[i][2] = datalist[i][3]
+    
+x_test = vectorize_sequences(encoded_hands[number_of_trainhands:(number_of_trainhands + number_of_testhands)], number_of_trainhands)
+y_test = np.zeros((number_of_testhands, 3), dtype = int)
+for i in range(number_of_testhands, number_of_trainhands + number_of_testhands-1):
+    y_test[i-number_of_trainhands][0] = datalist[i][1]
+    y_test[i-number_of_trainhands][1] = datalist[i][2]
+    y_test[i-number_of_trainhands][2] = datalist[i][3]
+
+
+
+model = models.Sequential()
+model.add(layers.Dense(5, activation='relu', input_shape=(15,)))
+model.add(layers.Dense(12, activation='relu'))
+model.add(layers.Dense(6, activation='relu'))
+model.add(layers.Dense(3, activation='softmax')) 
+model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+"""
+Training data gets split into real training data and validation training data
+"""
+
+x_val = x_train[:2000]
+partial_x_train = x_train[2000:]
+y_val = y_train[:2000]
+partial_y_train = y_train[2000:]
+
+
+"""
+Model gets fit and the history gets saved
+"""
+
+history = model.fit(partial_x_train, partial_y_train, epochs=180, batch_size=100, validation_data=(x_val, y_val))
+history_dict = history.history
+loss_values = history_dict['loss']
+val_loss_values = history_dict['val_loss']
+epochs = range(1, len(loss_values) + 1)
+
+
+"""
+Loss function plot
+"""
+plt.plot(epochs, loss_values, 'bo', label='Verlust Training')
+plt.plot(epochs, val_loss_values, 'b', label='Verlust Validierung')
+plt.title('Wert der Verlustfunktion Training/Validierung')
+plt.xlabel('Epochen')
+plt.ylabel('Wert der Verlustfunktion')
+plt.legend()
+plt.show()
+
+"""
+Preflop predictions for some random hands
+"""
+hands_to_classify = ['AKo', 'QAo', '27s', '95s', 'AAo', 'QQo', 'A2o', '53o', '22o', '93s', 'T3o', 'TAo', '55o', '66o', '77o', '88o', '99o','TTo', 'JJo', 'KKo']
+encoded_hands_to_classify = []
+for i in range(len(hands_to_classify)):
+    color = 0
+    card1_encoded = [char_to_int[char] for char in hands_to_classify[i][0]]
+    card2_encoded = [char_to_int[char] for char in hands_to_classify[i][1]]
+    if hands_to_classify[i][2] == 's':
+        color = 1
+    encoded_hands_to_classify.append((card1_encoded[0], card2_encoded[0], color))
+    
+array_to_classify = vectorize_sequences(encoded_hands_to_classify, 0)
+predictions = model.predict(array_to_classify)
+for i in range(len(predictions)):
+    max_predict = max(predictions[i][0], predictions[i][1], predictions[i][2])
+    if predictions[i][0] == max_predict:
+        print(hands_to_classify[i] + ': Fold \t \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
+    elif predictions[i][1] == max_predict:
+        print(hands_to_classify[i] + ': Call/Check \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
+    else:
+        print(hands_to_classify[i] + ': Raise \t \t Position:' + str(datalist[i][4]) + '\t(' + str(predictions[i]) + ')')
+
+
+"""
+Neural network to compute the amount of chips the player needs to raise
+"""
+chips_raised = []
+for file in glob.glob("*.log"):
+    allData = parsePluribus(file)
+    for (i, item) in enumerate(getPluribusHands(allData[4:-1], "Pluribus")):
+            if item[10][0][2] == 1:
+                chips_raised.append((item[3], item[10][0][3], item[10][0][5], item[4]))
+encoded_raise_hands = encode_hands(chips_raised)
+x_raise_train = prepare_raise_inputs(encoded_raise_hands[0:1000], chips_raised[0:1000], 0)
+y_raise_train = np.zeros((1000, 7), dtype = int)
+for i in range(0,999):
+    if chips_raised[i][2] < 150:
+        y_raise_train[i][0] = 1
+    elif chips_raised[i][2] < 250:
+        y_raise_train[i][1] = 1
+    elif chips_raised[i][2] < 350:
+        y_raise_train[i][2] = 1
+    elif chips_raised[i][2] < 450:
+        y_raise_train[i][3] = 1
+    elif chips_raised[i][2] < 550:
+        y_raise_train[i][4] = 1
+    elif chips_raised[i][2] < 650:
+        y_raise_train[i][5] = 1
+    else:
+        y_raise_train[i][5] = 1
+
+x_raise_test = prepare_raise_inputs(encoded_raise_hands[1001:1011], chips_raised[1001:1011], 1001)
+y_raise_test = np.zeros((10, 7), dtype = int)
+for i in range(0,10):
+    if chips_raised[i][2] < 150:
+        y_raise_train[i][0] = 1
+    elif chips_raised[i][2] < 250:
+        y_raise_train[i][1] = 1
+    elif chips_raised[i][2] < 350:
+        y_raise_train[i][2] = 1
+    elif chips_raised[i][2] < 450:
+        y_raise_train[i][3] = 1
+    elif chips_raised[i][2] < 550:
+        y_raise_train[i][4] = 1
+    elif chips_raised[i][2] < 650:
+        y_raise_train[i][5] = 1
+    else:
+        y_raise_train[i][5] = 1
+    
+x_raise_val = x_raise_train[:250]
+partial_x_raise_train = x_raise_train[250:]
+y_raise_val = y_raise_train[:250]
+partial_y_raise_train = y_raise_train[250:]
+
+model_raise = models.Sequential()
+model_raise.add(layers.Dense(5, activation='relu', input_shape=(16,)))
+model_raise.add(layers.Dense(12, activation='relu'))
+model_raise.add(layers.Dense(7, activation='softmax')) 
+model_raise.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+history_raise = model_raise.fit(partial_x_raise_train, partial_y_raise_train, epochs=110, batch_size=50, validation_data=(x_raise_val, y_raise_val))
+history_raise_dict = history_raise.history
+raise_loss_values = history_raise_dict['loss']
+val_raise_loss_values = history_raise_dict['val_loss']
+epochs = range(1, len(raise_loss_values) + 1)
+
+
+"""
+Raise predictions for some random preflop situations
+"""
+raises_to_classify = ['AKo Bet: 200', 'QAo Bet: 370', '9Ts Bet: 100', 'AAo Bet: 570', 'QQo Bet: 150', 'KKo Bet: 230', 'KQo Bet: 150', 'TTo Bet: 150', 'AAo Bet: 100']
+encoded_raise_hands_to_classify = []
+chips_bet = np.zeros((len(raises_to_classify), 2))
+for i in range(len(raises_to_classify)):
+    color = 0
+    chips_bet[i][1] = int(raises_to_classify[i][9:12])
+    card1_encoded = [char_to_int[char] for char in raises_to_classify[i][0]]
+    card2_encoded = [char_to_int[char] for char in raises_to_classify[i][1]]
+    if raises_to_classify[i][2] == 's':
+        color = 1
+    encoded_raise_hands_to_classify.append((card1_encoded[0], card2_encoded[0], color))
+raise_array_to_classify = prepare_raise_inputs(encoded_raise_hands_to_classify, chips_bet, 0)
+raise_predictions = model_raise.predict(raise_array_to_classify)
+for i in range(len(raise_predictions)):
+    max_predict = max(raise_predictions[i][0], raise_predictions[i][1], raise_predictions[i][2], raise_predictions[i][3], raise_predictions[i][4], raise_predictions[i][5], raise_predictions[i][6])
+    if raise_predictions[i][0] == max_predict:
+        print(raises_to_classify[i] + ': Raise 100 additional Chips')
+    elif raise_predictions[i][1] == max_predict:
+        print(raises_to_classify[i] + ': Raise 200 additional Chips')
+    elif raise_predictions[i][2] == max_predict:
+        print(raises_to_classify[i] + ': Raise 300 additional Chips')
+    elif raise_predictions[i][3] == max_predict:
+        print(raises_to_classify[i] + ': Raise 400 additional Chips')
+    elif raise_predictions[i][4] == max_predict:
+        print(raises_to_classify[i] + ': Raise 500 additional Chips')
+    elif raise_predictions[i][5] == max_predict:
+        print(raises_to_classify[i] + ': Raise 600 additional Chips')
+    else:
+        print(raises_to_classify[i] + ': Raise All-in')
