@@ -1,5 +1,3 @@
-import pandas as pd
-import numpy as np
 import re
 import copy
 
@@ -7,6 +5,7 @@ höheBigblind = 100
 höheSmallblind = 50
 bigblind_pos = 1
 smallblind_pos = 0
+anzahl_spieler = 6
 
 def parsePluribus(path_to_txt):
     op = open (path_to_txt, "r")
@@ -25,13 +24,14 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
     spieler_temp = copy.deepcopy(spieler)
     singlepot = [0] * (len(spieler_temp)+1)
     if(isPreflop):
+        print(spieler)
         caller = höheBigblind
         spieler_temp.remove(spieler_temp[0])
         spieler_temp.remove(spieler_temp[0])
         spieler_temp.append(spieler[0])
         spieler_temp.append(spieler[1])
-        singlepot[len(spieler_temp)-1] = höheSmallblind
-        singlepot[len(spieler_temp)-2] = höheBigblind
+        singlepot[len(spieler_temp)-2] = höheSmallblind
+        singlepot[len(spieler_temp)-1] = höheBigblind
     else:
         singlepot = actualPot
         caller = singlepot[0]
@@ -52,7 +52,8 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
                 k = k + 1
             raise_amount = int(raise_amount_string) - singlepot[j]
             if(spieler_temp[j] == spielername):
-                ret.append((0,0,1, raise_amount, sum(singlepot)))
+                max_bet = max(singlepot)
+                ret.append((0,0,1, max_bet, sum(singlepot), raise_amount - max_bet))
             caller = int(raise_amount_string)
             singlepot[j] = int(raise_amount_string)
             i =+ k-1
@@ -66,9 +67,9 @@ def calculateSituation(spieler, spielername, situation_string, actualPot, isPref
             j = j - 1
         if(situation_string[i] == "c"):
             raise_amount = caller - singlepot[j]
-            singlepot[j] = caller
             if(spieler_temp[j] == spielername):
                 ret.append((0,1,0, raise_amount, sum(singlepot)))
+            singlepot[j] = caller
         j = j + 1
         i = i + 1
 
